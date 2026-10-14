@@ -25,7 +25,7 @@ import {
 } from './game/api.js'
 import { hideProject, hiddenCatalog, unhideProject } from './game/hidden-projects.js'
 import { withErrands } from './game/errands.js'
-import { BETA } from './beta/config.js'
+import { BETA, BETA_BRANDING } from './beta/config.js'
 
 /**
  * Boot and the outer game loop.
@@ -42,16 +42,16 @@ const app = document.getElementById('app')
 app.insertAdjacentHTML(
   'beforeend',
   `<div class="boot"><div class="inner">
-     <h1>Bot Crossing ${BETA ? '— BETA' : ''}</h1>
+     <h1>Bot Crossing ${BETA_BRANDING ? '— BETA' : ''}</h1>
      <p>Scanning for agent threads…</p>
      <div class="bar"><i></i></div>
    </div></div>`
 )
 
-// BETA: unmistakable banner, pinned to the top of the screen. This is the
+// BETA branding: unmistakable banner, pinned to the top of the screen. This is the
 // test colony — it reads the live colony's public data but is NOT the live
-// colony, and nothing done here changes the live one.
-if (BETA) {
+// colony, and nothing done here changes the live one. Off on live.
+if (BETA_BRANDING) {
   document.title = 'Bot Crossing — BETA (test colony)'
   app.insertAdjacentHTML(
     'afterbegin',

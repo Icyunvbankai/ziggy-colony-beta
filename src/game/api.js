@@ -1,5 +1,5 @@
 import { mergeState } from './merge-state.js'
-import { BETA, LIVE_RAW_BASE, FALLBACK_STATE_URL } from '../beta/config.js'
+import { BETA_BRANDING, LIVE_RAW_BASE, FALLBACK_STATE_URL } from '../beta/config.js'
 
 /**
  * Static hosting (GitHub Pages): there is no server, so threads and colony state
@@ -236,10 +236,11 @@ async function fetchBundleThreads(urlBase = '') {
 
 export const fetchThreads = async () => {
   if (!STATIC) return req('/api/threads')
-  // BETA: read the SAME public data the live colony publishes, at runtime,
+  // BETA branding: read the SAME public data the live colony publishes, at runtime,
   // from the live repo. If that fails, fall back to the bundled copy of that
   // public data shipped with this build. The beta never writes anywhere.
-  if (BETA) {
+  // On live (branding off), data comes from local files — see below.
+  if (BETA_BRANDING) {
     try {
       return await fetchSplitThreads(LIVE_RAW_BASE)
     } catch {
@@ -297,10 +298,10 @@ function adoptBase(state, updatedAt) {
 }
 
 export const fetchState = async () => {
-  // BETA: this browser's own saved state (beta origin) wins, then the live
+  // BETA branding: this browser's own saved state (beta origin) wins, then the live
   // repo's published public state, then the bundled fallback copy. Read-only
   // throughout — the beta never writes to the live repo.
-  if (BETA) {
+  if (BETA_BRANDING) {
     try {
       const saved = localStorage.getItem(STATIC_STATE_KEY)
       if (saved) {

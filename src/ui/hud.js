@@ -4,6 +4,7 @@ import { TIMES, systemTimeOfDay } from '../world/sky.js'
 import { STATUS_LABEL } from '../game/colony.js'
 import { FACE, FRAME_COLS, FRAME_ROWS } from '../agents/faces.js'
 import { PLOT_PALETTE, hashString } from '../world/plots.js'
+import { BETA_BRANDING } from '../beta/config.js'
 
 /**
  * The whole HUD, in plain DOM.
@@ -1108,6 +1109,9 @@ function ago(ts) {
   return `${Math.floor(s / 86400)}d ago`
 }
 
+const HELP_SUB_BETA = `<b>🧪 BETA — TEST COLONY. Not the live colony.</b> Same real agent data, read live from the public colony data. New in this beta: real terrain (hills, valleys, ponds and a sea — plots sit on the land as terraces, bots walk over the hills), claim markers (spinning diamond = a working bot's claimed task), red distress beacons over blocked bots, a home desk per bot, status-coloured rings under every bot, and dimming for dormant stacks. Nothing you do here changes the live colony. Navigation works like Google Earth — drag the ground itself, right-drag to tilt, scroll to zoom in on whatever is under the cursor.`
+const HELP_SUB_LIVE = `Real agent data, live from the colony. Real terrain (hills, valleys, ponds and a sea — plots sit on the land as terraces, bots walk over the hills), claim markers (spinning diamond = a working bot's claimed task), red distress beacons over blocked bots, a home desk per bot, status-coloured rings under every bot, and dimming for dormant stacks. Navigation works like Google Earth — drag the ground itself, right-drag to tilt, scroll to zoom in on whatever is under the cursor.`
+
 const TEMPLATE = `
 <aside class="side panel">
   <div class="grab"></div>
@@ -1200,8 +1204,8 @@ const TEMPLATE = `
 
 <div class="help">
   <div class="sheet panel">
-    <h2>Bot Crossing — BETA</h2>
-    <p class="sub"><b>🧪 BETA — TEST COLONY. Not the live colony.</b> Same real agent data, read live from the public colony data. New in this beta: real terrain (hills, valleys, ponds and a sea — plots sit on the land as terraces, bots walk over the hills), claim markers (spinning diamond = a working bot's claimed task), red distress beacons over blocked bots, a home desk per bot, status-coloured rings under every bot, and dimming for dormant stacks. Nothing you do here changes the live colony. Navigation works like Google Earth — drag the ground itself, right-drag to tilt, scroll to zoom in on whatever is under the cursor.</p>
+    <h2>Bot Crossing${BETA_BRANDING ? ' — BETA' : ''}</h2>
+    <p class="sub">${BETA_BRANDING ? HELP_SUB_BETA : HELP_SUB_LIVE}</p>
     <div class="cols">
       <div>
         <div class="k"><span>Drag the ground</span><kbd>drag</kbd></div>
