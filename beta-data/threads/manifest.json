@@ -1,0 +1,187 @@
+{
+  "scannedAt": 1792007148088,
+  "total_agents": 189,
+  "total_threads": 189,
+  "stacks": [
+    {
+      "stack_id": "build-team",
+      "stack_title": "Build Team",
+      "file": "build-team.json",
+      "agent_count": 5
+    },
+    {
+      "stack_id": "colony-team",
+      "stack_title": "Colony App Team",
+      "file": "colony-team.json",
+      "agent_count": 6
+    },
+    {
+      "stack_id": "github-team",
+      "stack_title": "GitHub Team",
+      "file": "github-team.json",
+      "agent_count": 6
+    },
+    {
+      "stack_id": "marketing-team",
+      "stack_title": "Marketing & Brand Team",
+      "file": "marketing-team.json",
+      "agent_count": 25
+    },
+    {
+      "stack_id": "optimization-team",
+      "stack_title": "Optimization Team",
+      "file": "optimization-team.json",
+      "agent_count": 5
+    },
+    {
+      "stack_id": "qc-supervisor",
+      "stack_title": "QC Supervisor",
+      "file": "qc-supervisor.json",
+      "agent_count": 1
+    },
+    {
+      "stack_id": "social-aceloco",
+      "stack_title": "Aceloco Social Team",
+      "file": "social-aceloco.json",
+      "agent_count": 5
+    },
+    {
+      "stack_id": "social-bitstream-fm",
+      "stack_title": "Bitstream.fm Social Team",
+      "file": "social-bitstream-fm.json",
+      "agent_count": 5
+    },
+    {
+      "stack_id": "social-glitchmobz-clips",
+      "stack_title": "GlitchMobz Clips Social Team",
+      "file": "social-glitchmobz-clips.json",
+      "agent_count": 5
+    },
+    {
+      "stack_id": "social-mr-sunshine-state",
+      "stack_title": "Mr Sunshine State Social Team",
+      "file": "social-mr-sunshine-state.json",
+      "agent_count": 5
+    },
+    {
+      "stack_id": "social-teams-overview",
+      "stack_title": "Social Teams — Overview / Cross-Team Coordination",
+      "file": "social-teams-overview.json",
+      "agent_count": 1
+    },
+    {
+      "stack_id": "social-threads-mr-sunshine-state",
+      "stack_title": "Threads Mr Sunshine State Social Team",
+      "file": "social-threads-mr-sunshine-state.json",
+      "agent_count": 5
+    },
+    {
+      "stack_id": "social-x-bitstreamfm",
+      "stack_title": "X Bitstreamfm Social Team",
+      "file": "social-x-bitstreamfm.json",
+      "agent_count": 5
+    },
+    {
+      "stack_id": "social-youtube-bitstream",
+      "stack_title": "YouTube Bitstream Social Team",
+      "file": "social-youtube-bitstream.json",
+      "agent_count": 5
+    },
+    {
+      "stack_id": "stack-ad-creative-stack",
+      "stack_title": "ad-creative-stack",
+      "file": "stack-ad-creative-stack.json",
+      "agent_count": 7
+    },
+    {
+      "stack_id": "stack-app-factory",
+      "stack_title": "app-factory",
+      "file": "stack-app-factory.json",
+      "agent_count": 1
+    },
+    {
+      "stack_id": "stack-creator-repurpose-engine",
+      "stack_title": "creator-repurpose-engine",
+      "file": "stack-creator-repurpose-engine.json",
+      "agent_count": 5
+    },
+    {
+      "stack_id": "stack-dance-count-mapper",
+      "stack_title": "dance-count-mapper",
+      "file": "stack-dance-count-mapper.json",
+      "agent_count": 4
+    },
+    {
+      "stack_id": "stack-dm-comment-desk",
+      "stack_title": "dm-comment-desk",
+      "file": "stack-dm-comment-desk.json",
+      "agent_count": 7
+    },
+    {
+      "stack_id": "stack-giveaway-ops",
+      "stack_title": "giveaway-ops",
+      "file": "stack-giveaway-ops.json",
+      "agent_count": 9
+    },
+    {
+      "stack_id": "stack-grant-hunter",
+      "stack_title": "grant-hunter",
+      "file": "stack-grant-hunter.json",
+      "agent_count": 6
+    },
+    {
+      "stack_id": "stack-launch-stack",
+      "stack_title": "launch-stack",
+      "file": "stack-launch-stack.json",
+      "agent_count": 8
+    },
+    {
+      "stack_id": "stack-money-watch",
+      "stack_title": "money-watch",
+      "file": "stack-money-watch.json",
+      "agent_count": 6
+    },
+    {
+      "stack_id": "stack-podcast-episode-factory",
+      "stack_title": "podcast-episode-factory",
+      "file": "stack-podcast-episode-factory.json",
+      "agent_count": 11
+    },
+    {
+      "stack_id": "stack-research-desk",
+      "stack_title": "research-desk",
+      "file": "stack-research-desk.json",
+      "agent_count": 8
+    },
+    {
+      "stack_id": "stack-store-deal-desk",
+      "stack_title": "store-deal-desk",
+      "file": "stack-store-deal-desk.json",
+      "agent_count": 7
+    },
+    {
+      "stack_id": "stack-streamer-clip-farm",
+      "stack_title": "streamer-clip-farm",
+      "file": "stack-streamer-clip-farm.json",
+      "agent_count": 4
+    },
+    {
+      "stack_id": "stack-transcribeme-pipeline",
+      "stack_title": "transcribeme-pipeline",
+      "file": "stack-transcribeme-pipeline.json",
+      "agent_count": 6
+    },
+    {
+      "stack_id": "stack-whatsapp-shop-ops",
+      "stack_title": "whatsapp-shop-ops",
+      "file": "stack-whatsapp-shop-ops.json",
+      "agent_count": 7
+    },
+    {
+      "stack_id": "stack-zona-drop-stack",
+      "stack_title": "zona-drop-stack",
+      "file": "stack-zona-drop-stack.json",
+      "agent_count": 9
+    }
+  ]
+}

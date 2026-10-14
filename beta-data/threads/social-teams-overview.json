@@ -1,0 +1,45 @@
+{
+  "stack_id": "social-teams-overview",
+  "stack_title": "Social Teams — Overview / Cross-Team Coordination",
+  "agents": [
+    {
+      "id": "muse:agent:social-teams-overview-cross-team-coordinator",
+      "preview": "",
+      "projectPath": "",
+      "worktree": "",
+      "cwd": "",
+      "gitBranch": "",
+      "model": "Muse Spark",
+      "effort": "",
+      "createdAt": 1792004695202,
+      "lastActivityAt": 1791661548088,
+      "lastFocusedAt": 0,
+      "running": false,
+      "unread": false,
+      "hasError": false,
+      "starred": false,
+      "routine": false,
+      "prState": "",
+      "archived": false,
+      "canOpen": false,
+      "subagents": [],
+      "title": "Cross-Team Coordinator",
+      "project": "Social Teams — Overview / Cross-Team Coordination",
+      "stack_id": "social-teams-overview",
+      "stack_title": "Social Teams — Overview / Cross-Team Coordination",
+      "agent_id": "social-teams-overview-cross-team-coordinator",
+      "agent_role": "Cross-Team Coordinator",
+      "tile_index": 0,
+      "sizeBytes": 2000,
+      "source": "agent",
+      "ref": {
+        "kind": "agent",
+        "id": "agent:social-teams-overview-cross-team-coordinator",
+        "agent_id": "social-teams-overview-cross-team-coordinator",
+        "stack_id": "social-teams-overview"
+      }
+    }
+  ],
+  "scannedAt": 1792007148088,
+  "warnings": []
+}

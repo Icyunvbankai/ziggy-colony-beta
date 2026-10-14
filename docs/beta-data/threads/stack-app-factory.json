@@ -1,0 +1,45 @@
+{
+  "stack_id": "stack-app-factory",
+  "stack_title": "app-factory",
+  "agents": [
+    {
+      "id": "muse:agent:stack-app-factory-qc-agent",
+      "preview": "",
+      "projectPath": "",
+      "worktree": "",
+      "cwd": "",
+      "gitBranch": "",
+      "model": "Muse Spark",
+      "effort": "",
+      "createdAt": 1792004695202,
+      "lastActivityAt": 1791661548088,
+      "lastFocusedAt": 0,
+      "running": false,
+      "unread": false,
+      "hasError": false,
+      "starred": false,
+      "routine": false,
+      "prState": "",
+      "archived": false,
+      "canOpen": false,
+      "subagents": [],
+      "title": "App Factory QC agent",
+      "project": "app-factory",
+      "stack_id": "stack-app-factory",
+      "stack_title": "app-factory",
+      "agent_id": "stack-app-factory-qc-agent",
+      "agent_role": "QC agent",
+      "tile_index": 0,
+      "sizeBytes": 2000,
+      "source": "agent",
+      "ref": {
+        "kind": "agent",
+        "id": "agent:stack-app-factory-qc-agent",
+        "agent_id": "stack-app-factory-qc-agent",
+        "stack_id": "stack-app-factory"
+      }
+    }
+  ],
+  "scannedAt": 1792007148088,
+  "warnings": []
+}

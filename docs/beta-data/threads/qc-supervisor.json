@@ -1,0 +1,45 @@
+{
+  "stack_id": "qc-supervisor",
+  "stack_title": "QC Supervisor",
+  "agents": [
+    {
+      "id": "muse:agent:qc-supervisor-supervisor-qc",
+      "preview": "",
+      "projectPath": "",
+      "worktree": "",
+      "cwd": "",
+      "gitBranch": "",
+      "model": "Muse Spark",
+      "effort": "",
+      "createdAt": 1792004695202,
+      "lastActivityAt": 1791661548088,
+      "lastFocusedAt": 0,
+      "running": false,
+      "unread": false,
+      "hasError": false,
+      "starred": false,
+      "routine": false,
+      "prState": "",
+      "archived": false,
+      "canOpen": false,
+      "subagents": [],
+      "title": "Supervisor QC",
+      "project": "QC Supervisor",
+      "stack_id": "qc-supervisor",
+      "stack_title": "QC Supervisor",
+      "agent_id": "qc-supervisor-supervisor-qc",
+      "agent_role": "Supervisor QC",
+      "tile_index": 0,
+      "sizeBytes": 2000,
+      "source": "agent",
+      "ref": {
+        "kind": "agent",
+        "id": "agent:qc-supervisor-supervisor-qc",
+        "agent_id": "qc-supervisor-supervisor-qc",
+        "stack_id": "qc-supervisor"
+      }
+    }
+  ],
+  "scannedAt": 1792007148088,
+  "warnings": []
+}
