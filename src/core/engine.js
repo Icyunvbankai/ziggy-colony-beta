@@ -101,6 +101,14 @@ export class Engine {
     this._boundLoop = this._loop.bind(this)
     this._onResize = () => this.resize()
 
+    // Tiered shadows (Proposal 3, beta): when on, the shadow map does NOT
+    // re-render every frame. It renders once when `requestShadowUpdate()` is
+    // called (near-set change, near bot moved, sun moved — throttled upstream).
+    this._tieredShadows = false
+    this._shadowRequested = false
+    /** Count of shadow-map renders while tiered — the §4 verification number. */
+    this.shadowUpdates = 0
+
     this.applySettings()
   }
 
@@ -136,6 +144,19 @@ export class Engine {
   add(updater) {
     this.updaters.push(updater)
     return updater
+  }
+
+  /** Freeze / unfreeze the shadow map for tiered rendering. */
+  setTieredShadows(on) {
+    if (this._tieredShadows === on) return
+    this._tieredShadows = on
+    this.renderer.shadowMap.autoUpdate = !on
+    if (on) this.requestShadowUpdate()
+  }
+
+  /** Ask for exactly one shadow-map render on the next frame (tiered mode). */
+  requestShadowUpdate() {
+    this._shadowRequested = true
   }
 
   /** Rebuilds only what a settings change actually invalidated. */
@@ -397,6 +418,13 @@ export class Engine {
 
   _draw(dt) {
     this._resizeBuffers()
+    // Tiered shadows: one explicit shadow-map render per request, never a
+    // per-frame re-render. Three consumes needsUpdate during the render below.
+    if (this._tieredShadows && this._shadowRequested) {
+      this.renderer.shadowMap.needsUpdate = true
+      this._shadowRequested = false
+      this.shadowUpdates++
+    }
     if (this.composer && this._wantsPost()) {
       // The scene pass sees everything but the overlay; the overlay pass sees only it.
       this.camera.layers.set(0)

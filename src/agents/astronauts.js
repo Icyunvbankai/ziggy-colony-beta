@@ -8,6 +8,14 @@ import { bendPoint, withCurve } from '../core/curve.js'
 import { Props, CHECK_LEN, CHECK_EVERY, pickProp } from './props.js'
 import { projectHitPoint, bodyHitDistance } from './picking.js'
 import { helmetGeometry, visorGeometry, screenGeometry } from './model.js'
+import {
+  STATUS_TRIM,
+  TIER_BANDS,
+  assignTier,
+  tierBlendScale,
+  ShadowGate,
+  TierMeshes,
+} from './agent-tiers.js'
 
 /**
  * Every astronaut in the colony, batched into a fixed set of instanced draw calls.
@@ -34,16 +42,18 @@ import { helmetGeometry, visorGeometry, screenGeometry } from './model.js'
 
 const SUIT_TONES = [0xf3f1ec, 0xe8e4dc, 0xf7f4ee, 0xdfe4e8, 0xf1e9df]
 
-/** Trim + eye colour per behaviour. Eyes are pushed past 1.0 so the bloom pass catches them. */
+/** Trim + eye colour per behaviour. Eyes are pushed past 1.0 so the bloom pass catches them.
+ * Trim comes from STATUS_TRIM (agent-tiers.js) — the single shared palette every
+ * tier colours bots from, so colour meaning never changes across tiers. */
 const AGENT_LOOK = {
-  working: { trim: 0x4f9a63, eye: [0.35, 2.5, 1.15] },
-  waiting: { trim: 0x4f7ec9, eye: [0.45, 1.5, 3.0] },
-  blocked: { trim: 0xc94f4f, eye: [3.0, 0.5, 0.45] },
-  celebrating: { trim: 0xc9a24f, eye: [2.9, 2.1, 0.6] },
-  idle: { trim: 0x8b8b85, eye: [1.1, 1.5, 1.7] },
-  sleeping: { trim: 0x5a5a70, eye: [0.7, 0.8, 1.4] },
-  spawning: { trim: 0xc96442, eye: [2.4, 1.4, 0.7] },
-  leaving: { trim: 0x6f7f75, eye: [1.0, 1.0, 1.1] },
+  working: { trim: STATUS_TRIM.working, eye: [0.35, 2.5, 1.15] },
+  waiting: { trim: STATUS_TRIM.waiting, eye: [0.45, 1.5, 3.0] },
+  blocked: { trim: STATUS_TRIM.blocked, eye: [3.0, 0.5, 0.45] },
+  celebrating: { trim: STATUS_TRIM.celebrating, eye: [2.9, 2.1, 0.6] },
+  idle: { trim: STATUS_TRIM.idle, eye: [1.1, 1.5, 1.7] },
+  sleeping: { trim: STATUS_TRIM.sleeping, eye: [0.7, 0.8, 1.4] },
+  spawning: { trim: STATUS_TRIM.spawning, eye: [2.4, 1.4, 0.7] },
+  leaving: { trim: STATUS_TRIM.leaving, eye: [1.0, 1.0, 1.1] },
 }
 
 const WALK_SPEED = 2.1
@@ -182,6 +192,19 @@ export class Astronauts {
     this._queue = []
     this._queueTimer = 0
     this._queueEvery = 0.3
+    // Camera-distance tiers (Proposal 3, beta only). The flag lives in settings
+    // (`agentTiers`); when off, every bot is near and the legacy renderer runs.
+    this._tiersEnabled = false
+    this._forcedNearId = null
+    /** Set when the shadow map needs one more render; consumed by main → engine. */
+    this.shadowDirty = false
+    this._shadowGate = new ShadowGate()
+    this._nearMoved = false
+    this._nearSetChanged = false
+    this._tierTick = 0
+    this.tierCounts = { near: 0, mid: 0, far: 0 }
+    // NOTE: this.tierMeshes is created by _buildMeshes() above — do NOT
+    // re-initialise it here, or the meshes just built are orphaned.
   }
 
   // ── construction ────────────────────────────────────────────────────────────────────
@@ -243,6 +266,15 @@ export class Astronauts {
     this.props = new Props(R, capacity)
     for (const mesh of this.props.meshes) this.group.add(mesh)
     this._applyShadowFlags()
+
+    // Mid/far tier meshes (one InstancedMesh each). Rebuilt with the rest on a
+    // capacity change; disposed with the colony.
+    if (this.tierMeshes) this.tierMeshes.dispose()
+    this.tierMeshes = new TierMeshes(this.group, capacity)
+    for (const agent of this.agents) {
+      agent._tierSlot = -1
+      agent.tierColorDirty = true
+    }
 
     // Ground rings for hover + selection. Two ordinary meshes, moved around as needed.
     this.hoverRing = ring(0.42, 0.5, 0x9fd8ff, 0.5)
@@ -429,6 +461,9 @@ export class Astronauts {
   }
 
   _applyShadowFlags() {
+    // With tiers on, the part meshes hold ONLY near bots (see _writeMatrices),
+    // so these flags are exactly "only the near tier casts dynamic shadows".
+    // Mid/far tier meshes are built with castShadow = false.
     const on = this.settings.shadowSize > 0
     for (const [name, mesh] of Object.entries(this.parts)) {
       const wants = name !== 'face' && name !== 'tip' && name !== 'lamp' && name !== 'visor'
@@ -446,6 +481,16 @@ export class Astronauts {
 
   onSettingsChanged(changed) {
     if (changed.has('shadows')) this._applyShadowFlags()
+    if (changed.has('agentTiers')) {
+      // Flag flip: every tier slot is stale, every tier colour is rewritten, and
+      // the frozen shadow map gets one fresh render on the next frame.
+      this._shadowGate.reset()
+      this.shadowDirty = true
+      for (const agent of this.agents) {
+        agent._tierSlot = -1
+        agent.tierColorDirty = true
+      }
+    }
     if (changed.has('textureQuality')) {
       this.faceTexture.dispose()
       this.faceTexture = buildFaceAtlas(Math.min(this.settings.textureSize * 2, 1024))
@@ -651,6 +696,14 @@ export class Astronauts {
       pathGoal: new THREE.Vector3(NaN, 0, NaN),
       colorDirty: true,
       index: -1,
+      // Camera-distance tier state (Proposal 3). `_tierSlot` is the slot this bot
+      // last wrote in its tier mesh; -1 forces a rewrite.
+      _tier: 'near',
+      _tierBlend: 1,
+      _tierSlot: -1,
+      tierColorDirty: true,
+      _tierPos: null,
+      _shadowPos: null,
       walkAmp: 0,
       screen: new THREE.Vector3(), // filled by the picker each frame
     }
@@ -748,10 +801,61 @@ export class Astronauts {
 
   // ── per-frame simulation ────────────────────────────────────────────────────────────
 
-  update(dt, elapsed) {
+  update(dt, elapsed, cameraPos) {
     const reduced = this.settings.get('reducedMotion')
     const anim = reduced ? 0.35 : 1
     let write = 0
+
+    // ── tier assignment ──────────────────────────────────────────────────
+    // Distance from the camera, with hysteresis inside assignTier so a drifting
+    // camera does not flicker bots between bands. Without a camera (tests, or
+    // before the first frame) every bot is near: the legacy path.
+    const tiersEnabled = this.settings.get('agentTiers') !== false && Boolean(cameraPos)
+    this._tiersEnabled = tiersEnabled
+    const counts = { near: 0, mid: 0, far: 0 }
+    for (const agent of this.agents) {
+      const prev = agent._tier || 'near'
+      let tier = 'near'
+      if (tiersEnabled) {
+        const dx = agent.pos.x - cameraPos.x
+        const dy = agent.pos.y - cameraPos.y
+        const dz = agent.pos.z - cameraPos.z
+        tier = assignTier(
+          Math.sqrt(dx * dx + dy * dy + dz * dz),
+          prev,
+          agent.id === this._forcedNearId
+        )
+      }
+      if (tier !== prev) {
+        agent._tier = tier
+        agent._tierBlend = 0
+        agent._tierSlot = -1
+        agent.tierColorDirty = true
+        if (tiersEnabled) this._nearSetChanged = true
+      } else {
+        agent._tierBlend = Math.min(1, (agent._tierBlend ?? 1) + dt / TIER_BANDS.TIER_BLEND_S)
+      }
+      agent._tier = tier
+      counts[tier]++
+      // A near bot that moved since the last shadow render invalidates the frozen
+      // shadow map (throttled by the gate below — at most ~7 renders/sec).
+      if (tiersEnabled && tier === 'near' && agent.state !== 'queued') {
+        const sp = agent._shadowPos || (agent._shadowPos = new THREE.Vector3(NaN, 0, NaN))
+        if (
+          Number.isNaN(sp.x) ||
+          Math.hypot(agent.pos.x - sp.x, agent.pos.z - sp.z) > 0.1
+        ) {
+          this._nearMoved = true
+          sp.copy(agent.pos)
+        }
+      }
+    }
+    this.tierCounts = counts
+    if (tiersEnabled && (this._nearMoved || this._nearSetChanged) && this._shadowGate.shouldUpdate(elapsed)) {
+      this.shadowDirty = true
+      this._nearMoved = false
+      this._nearSetChanged = false
+    }
 
     this._rebuildBuckets()
     this._routeBudget = PATH_BUDGET
@@ -765,8 +869,13 @@ export class Astronauts {
       }
       agent.stateAge += dt
       this._step(agent, dt, elapsed, anim)
-      this._animate(agent, dt, anim)
-      animateFace(agent, dt, anim)
+      // Mid/far bots keep simulating (they still walk to their sites) but do not
+      // advance animation or face frames — nothing renders those frames out there,
+      // and skipping them is the per-frame CPU win. The clip resumes on return.
+      if (!tiersEnabled || agent._tier === 'near') {
+        this._animate(agent, dt, anim)
+        animateFace(agent, dt, anim)
+      }
 
       if (agent.state === 'gone') {
         this.agents.splice(i, 1)
@@ -776,8 +885,28 @@ export class Astronauts {
       write++
     }
 
-    this._writeMatrices(elapsed, anim)
+    this._writeMatrices(elapsed, anim, dt)
     return write
+  }
+
+  /** Click-to-focus / selection pins a bot to the near tier while focused. */
+  setForcedNear(id) {
+    this._forcedNearId = id || null
+  }
+
+  /** This bot's tier right now ('near' when tiers are off or unassigned). */
+  tierOf(agent) {
+    return this._tiersEnabled ? agent._tier || 'near' : 'near'
+  }
+
+  /** HUD readout: { enabled, near, mid, far }. */
+  tierStats() {
+    return { enabled: Boolean(this._tiersEnabled), ...this.tierCounts }
+  }
+
+  /** Resolve a raycast `instanceId` on a tier mesh to its bot, or null. */
+  agentForInstance(tier, instanceId) {
+    return this.tierMeshes?.agentForInstance(tier, instanceId) ?? null
   }
 
   /** Let the next queued astronaut out of the ship when its turn comes. */
@@ -1440,7 +1569,7 @@ export class Astronauts {
 
   // ── writing the instance buffers ────────────────────────────────────────────────────
 
-  _writeMatrices(elapsed, anim) {
+  _writeMatrices(elapsed, anim, dt = 0) {
     const { helmet, visor, pack, antenna, tip, lamp, face, hammer } = this.parts
     const rig = this.rig
     const crew = this.crew
@@ -1461,6 +1590,17 @@ export class Astronauts {
     const props = this.props
     props.begin()
     props.update(elapsed)
+    // Tier meshes: mid/far matrices refresh only on move / status change /
+    // tier change / the 4 Hz tick — the per-frame bone work below is near-only.
+    const tiersEnabled = this._tiersEnabled
+    this._tierTick += dt
+    const tierTickDue = tiersEnabled && this._tierTick >= TIER_BANDS.TIER_TICK_S
+    if (tierTickDue) this._tierTick = 0
+    if (tiersEnabled) {
+      this.tierMeshes.setVisible(true)
+      this.tierMeshes.begin()
+    }
+    this._drawnAgents.length = 0
     for (const agent of this.agents) {
       // Never write past the end of the instance buffers. Going over is not a rendering
       // artefact you can squint past: WebGL refuses the whole `drawElementsInstanced` call, so
@@ -1471,10 +1611,20 @@ export class Astronauts {
       // vacated in the roster is immediately filled by a thread that was previously past the
       // cap. Archive one thread on a colony sitting at the cap and there is briefly one more
       // agent than there are slots, which is exactly when the colony would empty.
-      if (i >= this.capacity) break
       if (agent.state === 'gone') continue
       const s = agent.scale
       if (s <= 0.001) continue
+
+      // Mid/far bots never touch the part meshes: one cheap tier write, or
+      // nothing at all when the bot has not moved and the tick is not due.
+      // They do not consume part-mesh slots, so the capacity break below is
+      // near-only — a full near set must not hide the mid/far bots behind it.
+      if (tiersEnabled && agent._tier !== 'near') {
+        this._writeTierAgent(agent, tierTickDue)
+        this._drawnAgents.push(agent)
+        continue
+      }
+      if (i >= this.capacity) break
 
       // Root transform for the whole character. The rig is authored at 2.2 units tall, so
       // CREW_SCALE rides along here and everything downstream inherits it.
@@ -1547,7 +1697,7 @@ export class Astronauts {
       frames[i * 2 + 1] = 1 - (Math.floor(f / FRAME_COLS) + 1) / FRAME_ROWS
 
       agent.index = i
-      this._drawnAgents[i] = agent
+      this._drawnAgents.push(agent)
       i++
     }
 
@@ -1559,16 +1709,73 @@ export class Astronauts {
       mesh.count = name === 'hammer' ? hands : n
       mesh.instanceMatrix.needsUpdate = true
       if (mesh.instanceColor && (staticDirty || animated.has(name))) mesh.instanceColor.needsUpdate = true
+      // With tiers on, the part meshes hold ONLY near bots — which is what makes
+      // "only the near tier casts dynamic shadows" true: the shadow pass draws
+      // these meshes, and mid/far bots are simply not in them. At overview the
+      // near set is empty, so hide the part meshes outright (0-count draws).
+      if (tiersEnabled) mesh.visible = n > 0
+      else mesh.visible = true
     }
     if (crew) {
       crew.count = n
       crew.instanceMatrix.needsUpdate = true
       this.crewFrameAttr.needsUpdate = true
       if (staticDirty && crew.instanceColor) crew.instanceColor.needsUpdate = true
+      if (tiersEnabled) crew.visible = n > 0
+      else crew.visible = true
     }
+    if (tiersEnabled) this.tierMeshes.end()
+    else this.tierMeshes.setVisible(false)
     this.frameAttr.needsUpdate = true
-    this.visibleCount = n
-    this._drawnAgents.length = n
+    this.visibleCount = this._drawnAgents.length
+  }
+
+  /**
+   * Write one mid/far bot into its tier mesh — or skip it. Matrices refresh
+   * only when the bot moved, changed status/tier, or the 4 Hz tick is due;
+   * slots stay stable in steady state, so a skipped bot keeps the matrix it
+   * already has at exactly its slot. Colours rewrite on status/tier change
+   * (or slot change, where the slot's old colour would be another bot's).
+   */
+  _writeTierAgent(agent, tickDue) {
+    const tm = this.tierMeshes
+    const scale = tierBlendScale(agent._tierBlend ?? 1)
+    const tp = agent._tierPos || (agent._tierPos = new THREE.Vector3(NaN, 0, NaN))
+    const moved =
+      Number.isNaN(tp.x) ||
+      (agent.pos.x - tp.x) * (agent.pos.x - tp.x) +
+        (agent.pos.z - tp.z) * (agent.pos.z - tp.z) >
+        TIER_BANDS.TIER_MOVE_EPS * TIER_BANDS.TIER_MOVE_EPS
+    if (agent._tier === 'mid') {
+      const slot = tm._midN
+      const slotChanged = agent._tierSlot !== slot
+      const matrixDirty = slotChanged || moved || tickDue
+      const colorDirty = agent.tierColorDirty || slotChanged
+      if (matrixDirty) {
+        tm.writeMid(agent, scale)
+        tm.writeBlob(agent, scale)
+        tp.copy(agent.pos)
+      } else {
+        tm.skipMid(agent)
+        tm.skipBlob()
+      }
+      if (colorDirty) tm.writeMidColor(agent, slot)
+      agent._tierSlot = slot
+    } else {
+      const slot = tm._farN
+      const slotChanged = agent._tierSlot !== slot
+      const matrixDirty = slotChanged || moved || tickDue
+      const colorDirty = agent.tierColorDirty || slotChanged
+      if (matrixDirty) {
+        tm.writeFar(agent, scale)
+        tp.copy(agent.pos)
+      } else {
+        tm.skipFar(agent)
+      }
+      if (colorDirty) tm.writeFarColor(agent, slot)
+      agent._tierSlot = slot
+    }
+    agent.tierColorDirty = false
   }
 
   // ── picking ─────────────────────────────────────────────────────────────────────────
@@ -1592,7 +1799,12 @@ export class Astronauts {
       this._q.setFromEuler(this._e)
       this._m.compose(agent.pos, this._q, this._one.setScalar(scale))
       this._one.setScalar(1)
-      for (let i = 0; i < PICK_PARTS.length; i++) {
+      // Near bots get the full multi-part body pick (head/chest/hands/feet).
+      // Mid/far bots get ONE proxy sphere at the head: click-to-identify works
+      // in every tier, but only the near tier pays for per-part hit-testing.
+      const detailed = !this._tiersEnabled || agent._tier === 'near' || !agent._tier
+      const partCount = detailed ? PICK_PARTS.length : 1
+      for (let i = 0; i < partCount; i++) {
         const part = PICK_PARTS[i]
         if (this.rig && this._pickSlots[i] !== undefined) {
           attachMatrixAt(this.rig, agent.frame, this._pickSlots[i], this._m2)
@@ -1604,12 +1816,15 @@ export class Astronauts {
         projectHitPoint(v, part.radius * scale, camera, aspect, body[i])
       }
       let depth = Infinity
-      for (const point of body) if (point.visible) depth = Math.min(depth, point.z)
+      for (let i = 0; i < partCount; i++) if (body[i].visible) depth = Math.min(depth, body[i].z)
       if (depth === Infinity) continue
       agent.screen.set(body[0].x / aspect, body[0].y, body[0].z)
-      let d = bodyHitDistance(ndcX * aspect, ndcY, body[0], body[1])
-      for (let i = 2; i < body.length; i++) {
-        d = Math.min(d, bodyHitDistance(ndcX * aspect, ndcY, body[1], body[i]))
+      let d = bodyHitDistance(ndcX * aspect, ndcY, body[0], body[0])
+      if (detailed) {
+        d = Math.min(d, bodyHitDistance(ndcX * aspect, ndcY, body[0], body[1]))
+        for (let i = 2; i < body.length; i++) {
+          d = Math.min(d, bodyHitDistance(ndcX * aspect, ndcY, body[1], body[i]))
+        }
       }
 
       // The badge over an astronaut's head is what you actually aim at when one wants you —
@@ -1700,6 +1915,7 @@ export class Astronauts {
       mesh.material.dispose()
     }
     this._disposeCrew()
+    this.tierMeshes?.dispose()
     // The bone texture is the rig's, not this instance's — the rig outlives any one colony.
     this.faceTexture.dispose()
     this.scene.remove(this.group)

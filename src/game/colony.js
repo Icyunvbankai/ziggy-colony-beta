@@ -1133,9 +1133,20 @@ export class Colony {
     this.ship.update(dt, elapsed, night)
 
     this._growBuildings(dt)
-    this.astronauts.update(dt, elapsed)
+    this.astronauts.update(dt, elapsed, this.camera?.position)
     this.astronauts.updateRings(elapsed)
-    this.indicators.update(this.astronauts.agents, elapsed, (a) => this._badgeFor(a))
+    // Tiered rendering: badges are per-bot labels, and the labels toggle only
+    // ever shows them for near-tier bots. Far/mid bots keep their status
+    // readable as colour on their tier mesh — they just do not get a badge.
+    // (Stale badgeSize on a bot that left the near tier would leave a phantom
+    // pick bubble, so it is cleared explicitly for every non-near bot.)
+    const allAgents = this.astronauts.agents
+    const tiersOn = this.settings.get('agentTiers') !== false
+    const badgeAgents = tiersOn
+      ? allAgents.filter((a) => this.astronauts.tierOf(a) === 'near')
+      : allAgents
+    if (tiersOn) for (const a of allAgents) if (this.astronauts.tierOf(a) !== 'near') a.badgeSize = 0
+    this.indicators.update(badgeAgents, elapsed, (a) => this._badgeFor(a))
     // BETA: claim markers, distress beacons, home desks, status rings.
     this.betaOverlays?.sync(this.astronauts.agents, elapsed)
     this._emit(dt, elapsed)
@@ -1363,6 +1374,11 @@ export class Colony {
 
   pick(ndcX, ndcY, aspect) {
     return this.astronauts.pick(this.camera, ndcX, ndcY, aspect)
+  }
+
+  /** HUD readout for the tier chip: { enabled, near, mid, far }. */
+  tierStats() {
+    return this.astronauts.tierStats()
   }
 
   agentFor(id) {

@@ -267,6 +267,11 @@ export class Hud {
     )
     view.append(
       this._toggle('Follow selected bot', 'followSelected', 'Tracks the selected bot until you deselect. Drag to pan, right-drag to orbit, and scroll to zoom.'),
+      this._toggle(
+        'Agent distance tiers',
+        'agentTiers',
+        'BETA: near bots render in full detail; mid bots as one low-poly mesh; far bots as colour dots. Only near bots cast shadows, and the shadow map updates on demand instead of every frame. Off = the legacy renderer (all bots full detail) for A/B comparison.'
+      ),
       this._toggle('Return to isometric', 'autoFrame', 'Eases the angle back when you stop dragging.'),
       this._slider('Field of view', 'fov', 20, 60, 1, (v) => `${v}°`),
       this._toggle('Project labels', 'showLabels'),
@@ -875,6 +880,24 @@ export class Hud {
     c.globalAlpha = 1
   }
 
+  /**
+   * Persistent tier/quality indicator (Proposal 3): how many bots are in each
+   * camera-distance tier right now. Always visible — it is the one readout
+   * that says whether the tiered renderer is doing anything. DOM writes only
+   * when the text actually changes.
+   */
+  setTierStats(stats) {
+    if (!stats) return
+    const el = this.$('.tier-chip')
+    const text = stats.enabled
+      ? `LOD · ${stats.near} near · ${stats.mid} mid · ${stats.far} far`
+      : 'LOD off · legacy renderer'
+    if (this._last.tierText !== text) {
+      this._last.tierText = text
+      el.textContent = text
+    }
+  }
+
   setFps(perf, viewport, extra) {
     if (!this.settings.get('showFps')) return
     const el = this.$('.fps')
@@ -1172,6 +1195,7 @@ const TEMPLATE = `
 
 <div class="toasts"></div>
 <div class="fps panel"></div>
+<div class="tier-chip panel"></div>
 <div class="hint-pill panel"></div>
 
 <div class="help">

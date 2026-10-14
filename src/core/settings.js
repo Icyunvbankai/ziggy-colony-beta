@@ -200,6 +200,15 @@ const DEFAULTS = {
   // Behaviour
   autoQuality: true, // drop render scale when frames get expensive
   autoFrame: false, // ease the camera back to isometric when you stop dragging; opt-in
+  /**
+   * Camera-distance agent tiers (Proposal 3, BETA ONLY): near bots render in
+   * full detail, mid bots as one low-poly instanced mesh, far bots as dots;
+   * only near bots cast dynamic shadows and the shadow map freezes between
+   * throttled updates. OFF = the legacy renderer (all bots full detail,
+   * shadow map re-rendered every frame) — the A/B comparison. Not a quality
+   * preset key, so flipping presets never silently changes it.
+   */
+  agentTiers: true,
   // On by default: picking a bot is nearly always the start of watching it, and having to find
   // the toggle first meant the one you clicked had usually walked off before you got there.
   followSelected: true, // track the selected bot while retaining manual camera controls
