@@ -14,7 +14,7 @@ Uses the proven surrogate pattern (see ~/workspace/build-shop-redesign.py).
 import base64, hashlib, json, os, sys, time, urllib.error, urllib.request
 from http.client import RemoteDisconnected
 
-sys.path.insert(0, "/opt/hatch/skills/skill-creator/bin")
+sys.path.insert(0, "/opt/muse/skills/custom-connector-setup/bin")
 from dynamic_credentials import add_surrogate_to_request, read_json_response
 
 OWNER = "Icyunvbankai"

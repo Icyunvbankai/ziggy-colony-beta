@@ -15,6 +15,8 @@ import {
   allocateCells,
   shipPosition,
   createLabel,
+  createAgentLabel,
+  agentLabelText,
   hashString,
   worldToHex,
   DECK_TOP,
@@ -41,6 +43,7 @@ import {
   BETA_WATER_LEVEL,
 } from '../beta/terrain.js'
 import { BetaOverlays } from '../beta/overlays.js'
+import { agentLabelNear } from '../agents/agent-tiers.js'
 
 /**
  * The colony: everything that turns a list of agent threads into a place.
@@ -74,6 +77,11 @@ const TRAVEL_RADIUS = 0.12
 const LIVE_GROWTH = 0.004
 /** How many zones' positions to remember, including repos with nothing running in them. */
 const LAYOUT_MEMORY = 80
+/**
+ * How high an agent's name plate floats above the ground it stands on. A bot is
+ * ~1.5 units tall, so 2.3 clears its head with room for the plate itself (0.30).
+ */
+const AGENT_LABEL_HEIGHT = 2.3
 
 export const STATUS_ORDER = ['blocked', 'waiting', 'working', 'celebrating', 'idle', 'sleeping']
 
@@ -185,7 +193,7 @@ export class Colony {
     this.fauna = new Fauna(scene, settings)
     this.reflections = new SceneryReflections({
       scene, renderer, settings, sky: this.sky, astronauts: this.astronauts,
-      excluded: () => [this.labelGroup, this.indicators.mesh, this.particles.points,
+      excluded: () => [this.labelGroup, this.agentLabelGroup, this.indicators.mesh, this.particles.points,
         this.fauna.group, this.grass?.mesh],
     })
     /** Set by whoever owns the speakers: (name, x, y, z) for a sound the world just made. */
@@ -196,6 +204,12 @@ export class Colony {
     this.plotGroup = new THREE.Group()
     this.labelGroup = new THREE.Group()
     scene.add(this.plotGroup, this.labelGroup)
+    // Per-agent name plates live in their own group so the proximity gate can
+    // hide them without touching the stack HQ plates in labelGroup.
+    this.agentLabelGroup = new THREE.Group()
+    scene.add(this.agentLabelGroup)
+    /** `agent:<id>` → billboarded name-plate mesh. Cached, never rebuilt per frame. */
+    this.agentLabels = new Map()
 
     // Dismissing the HUD has to survive a poll: labels are chrome, and a scan landing while
     // everything is hidden must not quietly put them back on screen.
@@ -672,6 +686,7 @@ export class Colony {
     this._syncFaunaSites()
     this.stats = { ...stats, done: stats.celebrating }
     this.astronauts.setRoster(roster, this._world())
+    this._syncAgentLabels()
     return this.stats
   }
 
@@ -1119,6 +1134,77 @@ export class Colony {
     }
   }
 
+  /**
+   * One name plate per agent, cached by agent id: a poll that changes nothing
+   * moves nothing, and a plate is only remade when its agent's name changes (the
+   * text is baked into the canvas at creation). Agents that left the roster lose
+   * their plates. The plate follows its bot — beta bots wander off their home
+   * tile — and the proximity gate in `_updateAgentLabels` decides whether it shows.
+   */
+  _syncAgentLabels() {
+    const wanted = new Map()
+    for (const agent of this.astronauts.agents) {
+      wanted.set(`agent:${agent.id}`, {
+        text: agentLabelText(agent.thread),
+        accent: this.plots.get(agent.thread?.project)?.accent ?? 0x9a9aa2,
+      })
+    }
+
+    for (const [key, label] of this.agentLabels) {
+      if (wanted.has(key)) continue
+      this.agentLabelGroup.remove(label)
+      label.userData.dispose?.()
+      this.agentLabels.delete(key)
+    }
+
+    for (const [key, spec] of wanted) {
+      let label = this.agentLabels.get(key)
+      if (label && label.userData.agentText !== spec.text) {
+        this.agentLabelGroup.remove(label)
+        label.userData.dispose?.()
+        label = null
+      }
+      if (!label) {
+        label = createAgentLabel(spec.text, spec.accent)
+        label.userData.agentText = spec.text
+        label.userData.agentKey = key
+        label.userData.labelNear = false
+        this.agentLabels.set(key, label)
+        this.agentLabelGroup.add(label)
+      }
+    }
+  }
+
+  /**
+   * Agent name plates are proximity-gated: hidden until the camera is close, so
+   * the map stays readable at overview zoom and names appear only when you lean
+   * in to a bot. Follows the tier gate (near-tier bots get plates; tiers off
+   * falls back to the same distance band — see agentLabelNear). Stack HQ plates
+   * are untouched by this gate; `showLabels` still hides every label at once.
+   */
+  _updateAgentLabels(dt) {
+    const show = this.uiVisible && this.settings.get('showLabels')
+    const tiersOn = this.settings.get('agentTiers') !== false
+    const camPos = this.camera?.position
+    for (const agent of this.astronauts.agents) {
+      const label = this.agentLabels.get(`agent:${agent.id}`)
+      if (!label) continue
+      // Follow the bot; groundY keeps the plate steady while the bot hops.
+      label.position.set(agent.pos.x, (agent.groundY ?? agent.pos.y) + AGENT_LABEL_HEIGHT, agent.pos.z)
+      const near = agentLabelNear({
+        tiersOn,
+        tier: this.astronauts.tierOf(agent),
+        distance: camPos ? camPos.distanceTo(agent.pos) : Infinity,
+        prevNear: label.userData.labelNear ?? false,
+      })
+      label.userData.labelNear = near
+      const wanted = show && near ? 1 : 0
+      const next = THREE.MathUtils.damp(label.material.opacity, wanted, 9, dt)
+      label.material.opacity = next
+      label.visible = next > 0.01
+    }
+  }
+
   // ── per-frame ───────────────────────────────────────────────────────────────────────
 
   update(dt, elapsed, focus) {
@@ -1167,6 +1253,7 @@ export class Colony {
     this._updatePlots(night, elapsed)
     this._updateScaffolds()
     this._updateLabels(dt)
+    this._updateAgentLabels(dt)
     this.reflections.update(dt, focus || this.sky.focus, this.camera)
   }
 
@@ -1411,7 +1498,8 @@ export class Colony {
     disposeTree(this.worldGroup)
     disposeTree(this.plotGroup)
     disposeTree(this.labelGroup)
-    this.scene.remove(this.worldGroup, this.plotGroup, this.labelGroup)
+    disposeTree(this.agentLabelGroup)
+    this.scene.remove(this.worldGroup, this.plotGroup, this.labelGroup, this.agentLabelGroup)
   }
 }
 

@@ -702,13 +702,17 @@ export class Plot {
  * Project name plates. Drawn to a canvas once per project and billboarded in the vertex
  * shader, so they stay upright and legible from any camera angle without a per-frame
  * lookAt on the CPU.
+ *
+ * `opts` overrides the plate geometry (defaults = the project plate). Agent plates
+ * pass the compact variant via `createAgentLabel`, so ~190 of them can share the
+ * colony without shouting.
  */
-export function createLabel(text, accent, pixelRatio = 4) {
-  const fontSize = 34
+export function createLabel(text, accent, pixelRatio = 4, opts = {}) {
+  const fontSize = opts.fontSize ?? 34
   const font = `500 ${fontSize}px ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif`
-  const dot = 9
-  const gap = 10
-  const pad = 14
+  const dot = opts.dot ?? 9
+  const gap = opts.gap ?? 10
+  const pad = opts.pad ?? 14
 
   const measure = document.createElement('canvas').getContext('2d')
   measure.font = font
@@ -757,7 +761,7 @@ export function createLabel(text, accent, pixelRatio = 4) {
   texture.generateMipmaps = true
   texture.anisotropy = 8
 
-  const height = 0.56
+  const height = opts.height ?? 0.56
   const geo = new THREE.PlaneGeometry(height * (w / h), height)
   const mat = new THREE.MeshBasicMaterial({
     map: texture,
@@ -795,6 +799,25 @@ export function createLabel(text, accent, pixelRatio = 4) {
     mat.dispose()
   }
   return mesh
+}
+
+/**
+ * Display name for one agent's plate: the thread title, falling back to name/id.
+ * Same fallback chain as the detail card, so a plate never renders blank.
+ */
+export function agentLabelText(thread) {
+  return thread?.title || thread?.name || thread?.id || 'Untitled thread'
+}
+
+/**
+ * One agent's name plate: the same billboarded plate as a project label, smaller
+ * and without the accent dot, so ~190 of them can share the colony without shouting.
+ * Height 0.30 keeps even the longest roster name (~58 chars) under the ~4.4-unit
+ * spacing between neighbouring tiles. The plate follows its bot (beta bots wander
+ * off their home tile) and is proximity-gated by the colony — see agentLabelNear.
+ */
+export function createAgentLabel(text, accent) {
+  return createLabel(text, accent, 4, { height: 0.30, fontSize: 26, dot: 0, gap: 0, pad: 10 })
 }
 
 export function hashString(str) {

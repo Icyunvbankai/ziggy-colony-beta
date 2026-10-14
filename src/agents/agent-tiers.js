@@ -93,6 +93,20 @@ export function tierBlendScale(blend) {
 }
 
 /**
+ * Should this agent's name plate show? Proximity-gated: plates stay hidden until
+ * the camera is close, so the map reads clean at overview zoom.
+ *
+ * - Tiers on: the plate follows the bot's tier — near-tier bots get plates.
+ * - Tiers off: tierOf() reports 'near' for everyone, so gate on camera distance
+ *   directly with the same NEAR_IN / NEAR_OUT hysteresis band (prevNear carries
+ *   the dead-zone state, so a camera drifting across the threshold does not flicker).
+ */
+export function agentLabelNear({ tiersOn, tier, distance, prevNear }) {
+  if (tiersOn) return tier === 'near'
+  return assignTier(distance, prevNear ? 'near' : 'mid') === 'near'
+}
+
+/**
  * Throttle for shadow-map updates while tiers are on. The shadow map is frozen
  * (autoUpdate off); it re-renders at most every SHADOW_MIN_INTERVAL seconds,
  * and only when something actually invalidated it (near-set change, near bot
