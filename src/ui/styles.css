@@ -1634,3 +1634,66 @@ kbd {
 .thread-pop .beta-distress {
   color: #ffb3b3;
 }
+
+/* ── StarNet patterns panel (BETA ONLY, display/concept only) ─────────── */
+.starnet-fab {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 40;
+  background: var(--panel-solid);
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  color: var(--text);
+  padding: 8px 14px;
+  font-size: 12px;
+  cursor: pointer;
+  box-shadow: var(--shadow);
+}
+.starnet-panel {
+  position: fixed;
+  right: 16px;
+  bottom: 56px;
+  z-index: 40;
+  width: min(340px, calc(100vw - 32px));
+  max-height: min(70vh, 560px);
+  overflow-y: auto;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 14px 16px;
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.starnet-title { font-weight: 700; font-size: 14px; }
+.starnet-heading { font-weight: 700; margin: 14px 0 6px; font-size: 13px; }
+.starnet-line { color: var(--text); }
+.starnet-note { color: var(--muted); font-size: 12px; margin-top: 4px; }
+.starnet-empty { color: var(--muted); font-style: italic; }
+.starnet-item { padding: 6px 0; border-top: 1px solid var(--line); }
+.starnet-item-title { font-weight: 600; }
+.starnet-item-meta { color: var(--muted); font-size: 12px; }
+.starnet-brief-btn {
+  display: block;
+  width: 100%;
+  text-align: left;
+  margin: 6px 0 0;
+  background: var(--panel-solid);
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  color: var(--text);
+  padding: 7px 10px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.starnet-concept-note { color: var(--amber); font-size: 12px; margin-top: 8px; }
+.starnet-rail {
+  height: 8px;
+  background: var(--line);
+  border-radius: 999px;
+  overflow: hidden;
+  margin: 6px 0;
+}
+.starnet-rail-fill { height: 100%; width: 0%; background: var(--green); }

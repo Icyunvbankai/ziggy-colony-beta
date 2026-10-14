@@ -10,6 +10,29 @@
 
 ## What improved
 
+### 0. StarNet patterns — steal what's worth stealing (beta only)
+Three ideas borrowed from StarNet's evaluation (study-only — the app itself
+was NOT adopted), adapted to a visualization that must never act:
+- **Truthful telemetry:** every snapshot entry is schema-validated before it
+  renders. Entries that fail are dropped, counted, and reported — never
+  smoothed. Missing stamps are counted as unproven, never backfilled. A new
+  panel line shows the scan's health honestly: PROVEN / PARTIAL / STALE /
+  UNKNOWN, with counts and scan age.
+- **Object = capability (display only):** map objects project onto the
+  capabilities they stand for (HQ → team overview, distress beacon →
+  attention request, pond → nothing), recomputed fresh, with a kill-switch
+  that drops whole grant families from the display. Never permissions, never
+  real actions.
+- **Outbox + Task Brief + spend rail (display / concept only):** the Outbox
+  lists decisions waiting, derived only from the snapshot (blocked, then
+  waiting-on-you) — empty means empty. A Task Brief turns the first waiting
+  item into one concrete question with options; the options are concept-only
+  and do nothing. The spend rail reads $0 spent / $0 authorized — agents
+  spend nothing by rule; StarNet's $25/day soft rail is shown as a reference
+  design, NOT enabled. Nothing here is wired to spending, accounts, or real
+  agent control.
+- Open the panel with the **Outbox · Briefs · Spend** button, bottom-right.
+
 ### 1. Real topography — the ground is not flat anymore
 - **Hills and valleys:** a seeded heightmap (deterministic — the same ground
   every load) gives the colony rolling hills, ridged valleys and a shoreline.

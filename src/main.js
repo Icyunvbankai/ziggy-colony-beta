@@ -26,6 +26,7 @@ import {
 import { hideProject, hiddenCatalog, unhideProject } from './game/hidden-projects.js'
 import { withErrands } from './game/errands.js'
 import { BETA, BETA_BRANDING } from './beta/config.js'
+import { StarnetPatterns } from './ui/starnet-patterns.js'
 
 /**
  * Boot and the outer game loop.
@@ -328,6 +329,11 @@ ambience.setPlanet(colony.planet)
 colony.onSound = (name, x, y, z) => ambience.play(name, { x, y, z, kind: colony.fauna.flock?.kind })
 
 const hud = new Hud(app, settings, actions)
+
+// BETA ONLY: StarNet patterns panel (Outbox / Task Brief / spend rail /
+// capability grants / data health). Display + concept only — it never acts,
+// never approves, never spends, and never touches real agent control.
+const starnetPatterns = new StarnetPatterns(document.body)
 
 // ── selection ─────────────────────────────────────────────────────────────────────────
 
@@ -1028,9 +1034,17 @@ async function poll() {
   try {
     const res = await fetchThreads()
     applyThreads(res.threads || [])
+    // StarNet panel: honest data health + decisions waiting, from this poll.
+    const selected = selectedId ? threads.find((t) => t.id === selectedId) : null
+    starnetPatterns.update(
+      threads,
+      res.dataHealth || null,
+      selected ? { status: statusFor(selected) } : null
+    )
     hud.removeBoot()
   } catch (err) {
     hud.toast(err.message || 'Could not reach the thread scanner', 'err')
+    starnetPatterns.update(threads, { status: 'unknown', summary: 'UNKNOWN — last poll failed to reach the scanner' }, null)
     hud.removeBoot()
   } finally {
     polling = false

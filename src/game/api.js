@@ -1,5 +1,6 @@
 import { mergeState } from './merge-state.js'
 import { BETA_BRANDING, LIVE_RAW_BASE, FALLBACK_STATE_URL } from '../beta/config.js'
+import { assessDataHealth, findProvenanceGaps, validateThreads } from './telemetry.js'
 
 /**
  * Static hosting (GitHub Pages): there is no server, so threads and colony state
@@ -85,14 +86,18 @@ function manifestStacks(manifest) {
   return out
 }
 
+/** Raw entries of one stack/bundle payload, whatever shape the producer used. */
+function extractRawEntries(data) {
+  if (Array.isArray(data)) return data
+  const container = data && typeof data === 'object' ? data : {}
+  return container.threads || container.agents || container.stack?.agents || container.stack?.threads || []
+}
+
 /** One stack file → thread-shaped entries the colony already understands. */
 function normalizeStackThreads(data, stackKey, stackTitle) {
   const container = data && typeof data === 'object' && !Array.isArray(data) ? data : {}
   const project = container.stack_title || container.stackTitle || container.title || stackTitle || stackKey
-  const entries =
-    container.threads || container.agents ||
-    (Array.isArray(data) ? data : []) ||
-    container.stack?.agents || container.stack?.threads || []
+  const entries = extractRawEntries(data)
   // The live stack files carry `tile_index` in file order; honour it so slot
   // assignment follows the producer's tile order even if file order ever drifts.
   const ordered = [...(entries || [])].sort(
@@ -157,6 +162,22 @@ function normalizeStackThreads(data, stackKey, stackTitle) {
   return out
 }
 
+/** Recompute data health on a cached merge so a stale re-serve still reads stale. */
+function withFreshHealth(merged) {
+  if (!merged) return merged
+  return {
+    ...merged,
+    dataHealth: assessDataHealth({
+      threads: merged.threads || [],
+      scannedAt: merged.scannedAt ?? null,
+      warnings: merged.warnings || [],
+      gapCount: merged.gapCount || 0,
+      invalidCount: merged.invalidCount,
+      failedStacks: merged.failedStacks || 0,
+    }),
+  }
+}
+
 async function fetchSplitThreads(urlBase = '') {
   const manifestUrl = urlBase ? `${urlBase}/${THREADS_MANIFEST_URL}` : THREADS_MANIFEST_URL
   const res = await fetch(`${manifestUrl}?v=${Date.now()}`)
@@ -170,7 +191,7 @@ async function fetchSplitThreads(urlBase = '') {
   // fetches entirely. The manifest is refetched every poll (it is tiny); the tens
   // of KB of stack files are only refetched when something actually changed.
   if (stamp !== null && stamp === lastManifestStamp && !failedStacks.size && lastGoodMerged) {
-    return lastGoodMerged
+    return withFreshHealth(lastGoodMerged)
   }
   lastManifestStamp = stamp
 
@@ -182,15 +203,30 @@ async function fetchSplitThreads(urlBase = '') {
       const stackUrl = urlBase ? `${urlBase}/${stack.file}` : stack.file
       const r = await fetch(`${stackUrl}?v=${Date.now()}`)
       if (!r.ok) throw new Error(`Could not load ${stackUrl} (${r.status})`)
-      return { stack, threads: normalizeStackThreads(await r.json(), stack.key, stack.title) }
+      const raw = await r.json()
+      // Truthful telemetry: count unproven stamps on the RAW entries, before
+      // normalization fills missing stamps with "now" for layout stability.
+      // Entries that fail schema validation are dropped, counted, reported.
+      const rawEntries = extractRawEntries(raw)
+      const gapCount = rawEntries.reduce((n, e) => n + (findProvenanceGaps(e).length ? 1 : 0), 0)
+      const normalized = normalizeStackThreads(raw, stack.key, stack.title)
+      const { valid, invalid } = validateThreads(normalized)
+      return { stack, threads: valid, gapCount, invalidCount: invalid.length }
     })
   )
   const warnings = []
+  let gapCount = 0
+  let invalidCount = 0
   results.forEach((result, i) => {
     const stack = stacks[i]
     if (result.status === 'fulfilled') {
       lastGoodByStack.set(stack.key, result.value.threads)
       failedStacks.delete(stack.key)
+      gapCount += result.value.gapCount || 0
+      invalidCount += result.value.invalidCount || 0
+      if (result.value.invalidCount) {
+        warnings.push(`Stack ${stack.key}: ${result.value.invalidCount} entr${result.value.invalidCount === 1 ? 'y' : 'ies'} failed validation and were dropped`)
+      }
     } else {
       // Keep this stack's last-good bots; the failure is retried on the next poll.
       failedStacks.add(stack.key)
@@ -213,7 +249,18 @@ async function fetchSplitThreads(urlBase = '') {
     threads,
     scannedAt: typeof stamp === 'number' ? stamp : Date.now(),
     warnings,
+    gapCount,
+    invalidCount,
+    failedStacks: failedStacks.size,
   }
+  merged.dataHealth = assessDataHealth({
+    threads,
+    scannedAt: merged.scannedAt,
+    warnings,
+    gapCount,
+    invalidCount,
+    failedStacks: failedStacks.size,
+  })
   lastGoodMerged = merged
   return merged
 }
@@ -225,11 +272,28 @@ async function fetchBundleThreads(urlBase = '') {
   const res = await fetch(`${bundleUrl}?v=${Date.now()}`)
   if (!res.ok) throw new Error(`Could not load ${bundleUrl} (${res.status})`)
   const body = await res.json()
+  const rawEntries = extractRawEntries(body)
+  const gapCount = rawEntries.reduce((n, e) => n + (findProvenanceGaps(e).length ? 1 : 0), 0)
+  const { valid, invalid } = validateThreads(Array.isArray(body) ? body : body.threads || [])
   const out = {
-    threads: Array.isArray(body) ? body : body.threads || [],
+    threads: valid,
     scannedAt: body.scannedAt ?? Date.now(),
     warnings: body.warnings || [],
+    gapCount,
+    invalidCount: invalid.length,
+    failedStacks: failedStacks.size,
   }
+  if (invalid.length) {
+    out.warnings = [...out.warnings, `${invalid.length} bundle entr${invalid.length === 1 ? 'y' : 'ies'} failed validation and were dropped`]
+  }
+  out.dataHealth = assessDataHealth({
+    threads: valid,
+    scannedAt: out.scannedAt,
+    warnings: out.warnings,
+    gapCount,
+    invalidCount: invalid.length,
+    failedStacks: failedStacks.size,
+  })
   lastGoodMerged = out
   return out
 }
